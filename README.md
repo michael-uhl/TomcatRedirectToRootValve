@@ -1,14 +1,14 @@
-#TomcatRedirectToRootValve
+# TomcatRedirectToRootValve
 
 
-##Overview
+## Overview
 
 TomcatRedirectToRootValve is a custom Tomcat Valve that redirects all incoming requests 
 to the root context (/). The original request URI and context path are stored as request attributes, 
 allowing applications to access the original request information.
 
 
-##Building the Project
+## Building the Project
 
 To build the project, use the following Maven command:
 
@@ -18,7 +18,7 @@ mvn clean install
 This will generate the JAR file redirect2root-1.0.0.jar in the target/ directory.
 
 
-##Deployment Instructions
+## Deployment Instructions
 
 To deploy the Valve in your Tomcat installation:
 
@@ -46,7 +46,7 @@ $TOMCAT_HOME/bin/startup.sh
 ```
 
 
-##Functionality
+## Functionality
 
 Redirects all requests to / (root context).
 
@@ -78,6 +78,6 @@ String originalContext = (String) request.getAttribute("originalContextPath");
 ```
 
 
-##License
+## License
 
 This project is licensed under the BSD 3 License. See the LICENSE file for details.
