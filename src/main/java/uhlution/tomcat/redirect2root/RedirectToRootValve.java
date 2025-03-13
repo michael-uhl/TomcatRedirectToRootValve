@@ -61,7 +61,11 @@ public class RedirectToRootValve extends ValveBase {
 
 			String redirectUrl = evaluateRedirectUrl(originalUri, originalContext.length());
 
-			request.getRequestDispatcher(redirectUrl);
+			try {
+				request.getRequestDispatcher(redirectUrl).forward(request.getRequest(), response.getResponse());
+			} catch (ServletException | IOException e) {
+				throw new RuntimeException(e);
+			}
 		} else {
 			try {
 				getNext().invoke(request, response);

@@ -55,11 +55,18 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
+import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
 public class RedirectToRootValveTest {
 
     private RedirectToRootValve valve;
     private Request mockRequest;
     private Response mockResponse;
+    private RequestDispatcher mockRequestDispatcher;
+    private HttpServletRequest mockHttpServletReq;
+    private HttpServletResponse mockHttpServletResp;
     private Context mockContext;
 
     @BeforeEach
@@ -68,6 +75,9 @@ public class RedirectToRootValveTest {
         mockRequest = mock(Request.class);
         mockResponse = mock(Response.class);
         mockContext = mock(Context.class);
+        mockRequestDispatcher = mock(RequestDispatcher.class);
+        mockHttpServletReq = mock(HttpServletRequest.class);
+        mockHttpServletResp = mock(HttpServletResponse.class);
 
         Valve mockNextValve = mock(Valve.class);
         doNothing().when(mockNextValve).invoke(any(Request.class), any(Response.class));
@@ -75,6 +85,9 @@ public class RedirectToRootValveTest {
         
         // Simulate the context.
         when(mockRequest.getContext()).thenReturn(mockContext);
+        when(mockRequest.getRequestDispatcher(anyString())).thenReturn(mockRequestDispatcher);
+        when(mockRequest.getRequest()).thenReturn(mockHttpServletReq);
+        when(mockResponse.getResponse()).thenReturn(mockHttpServletResp);
         when(mockContext.getPath()).thenReturn("/");
         when(mockRequest.getContextPath()).thenReturn("");
     }
