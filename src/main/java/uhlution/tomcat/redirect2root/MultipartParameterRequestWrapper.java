@@ -7,17 +7,19 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
-import org.apache.catalina.connector.RequestFacade;
 import org.apache.catalina.util.ParameterMap;
 import org.apache.commons.fileupload2.core.DiskFileItem;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.Part;
 
 public class MultipartParameterRequestWrapper extends HttpServletRequestWrapper {
+	private static final Logger LOG = Logger.getLogger(MultipartParameterRequestWrapper.class.getName());
     private final Map<String, List<String>> parameters = new HashMap<>();
     private final Map<String, List<DiskFileItem>> fileItems = new HashMap<>();
 
@@ -31,8 +33,10 @@ public class MultipartParameterRequestWrapper extends HttpServletRequestWrapper 
         });
         
         // Cppies the POST-Parameters and Multipart-Data.
-        ParameterMap<String, String[]> parameterMap = (ParameterMap<String, String[]>)request.getParameterMap();
-		parameterMap.setLocked(false);
+        Map<String, String[]> parameterMap =  request.getParameterMap();
+        if (parameterMap instanceof ParameterMap<String, String[]>) {        	
+        	((ParameterMap<String, String[]>)parameterMap).setLocked(false);
+        }
         for (DiskFileItem item : items) {
             if (item.isFormField()) { // Falls kein Datei-Upload
                 addParameter(item.getFieldName(), item.getString());
@@ -41,7 +45,9 @@ public class MultipartParameterRequestWrapper extends HttpServletRequestWrapper 
             	fileItems.computeIfAbsent(item.getFieldName(), k -> new ArrayList<>()).add(item);
             }
         }
-        parameterMap.setLocked(true);
+        if (parameterMap instanceof ParameterMap<String, String[]>) {        	
+        	((ParameterMap<String, String[]>)parameterMap).setLocked(true);
+        }
         
         // Sets the parts in the request via Reflection.
         setPartsOnRequest(request, getParts());
@@ -91,20 +97,30 @@ public class MultipartParameterRequestWrapper extends HttpServletRequestWrapper 
     
     private void setPartsOnRequest(HttpServletRequest request, Collection<Part> parts) {
         try {
-        	Field innerRequestFld = request.getClass().getDeclaredField("request");
-        	innerRequestFld.setAccessible(true);
-        	HttpServletRequest innerRequest = (HttpServletRequest)innerRequestFld.get(request);
-        	innerRequestFld.setAccessible(false);
-        	
-            // Zugriff auf das `parts`-Feld in `org.apache.catalina.connector.Request`
-            Field partsField = innerRequest.getClass().getDeclaredField("parts");
-            partsField.setAccessible(true); // Zugriff auf private Felder ermöglichen
+        	if (hasField(request, "request")) {        		
+        		Field innerRequestFld = request.getClass().getDeclaredField("request");
+        		innerRequestFld.setAccessible(true);
+        		HttpServletRequest innerRequest = (HttpServletRequest)innerRequestFld.get(request);
+        		innerRequestFld.setAccessible(false);
 
-            // Setze die neue Parts-Liste in den Request
-            partsField.set(innerRequest, parts);
+        		// Zugriff auf das `parts`-Feld in `org.apache.catalina.connector.Request`
+        		Field partsField = innerRequest.getClass().getDeclaredField("parts");
+        		partsField.setAccessible(true); // Zugriff auf private Felder ermöglichen
+        		
+        		// Setze die neue Parts-Liste in den Request
+        		partsField.set(innerRequest, parts);
+        	}
         } catch (NoSuchFieldException | IllegalAccessException e) {
-            throw new RuntimeException("Fehler beim Zugriff auf Tomcats parts-Feld via Reflection", e);
+            LOG.warning("Fehler beim Zugriff auf Tomcats parts-Feld via Reflection:\n" + ExceptionUtils.getStackTrace(e));
         }
-    }    
+    }
+
+	private boolean hasField(HttpServletRequest request, String fieldName) throws NoSuchFieldException {
+		try {
+			return request.getClass().getDeclaredField(fieldName) != null;
+		} catch (Exception e) {
+			return false;
+		}
+	}    
 
 }

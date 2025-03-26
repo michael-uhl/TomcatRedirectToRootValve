@@ -56,6 +56,7 @@
 		<junit.version>5.11.0</junit.version>
 		<log4j.version>2.23.1</log4j.version>
 		<mockito.version>5.16.0</mockito.version>
+		<spring.test.version>7.0.0-M3</spring.test.version>
 		<net.bytebuddy.agent.disabled>true</net.bytebuddy.agent.disabled>
 		<maven.compiler.source>21</maven.compiler.source>
 		<maven.compiler.target>21</maven.compiler.target>
@@ -121,6 +122,18 @@
 			<artifactId>mockito-core</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-test</artifactId>
+			<version>${spring.test.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-web</artifactId>
+			<version>${spring.test.version}</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -151,17 +164,18 @@
 						</goals>
 						<configuration>
 							<createDependencyReducedPom>true</createDependencyReducedPom>
-				            <filters>
-				              <filter>
-				                <artifact>*:*</artifact>
-				                <excludes>
-				                  <exclude>META-INF/MANIFEST.MF</exclude>
-				                  <exclude>META-INF/LICENSE.txt</exclude>
-				                  <exclude>META-INF/NOTICE.txt</exclude>
-				                  <exclude>META-INF/versions/9/module-info.class</exclude>
-				                </excludes>
-				              </filter>
-				            </filters>
+							<filters>
+								<filter>
+									<artifact>*:*</artifact>
+									<excludes>
+										<exclude>META-INF/MANIFEST.MF</exclude>
+										<exclude>META-INF/LICENSE.txt</exclude>
+										<exclude>META-INF/NOTICE.txt</exclude>
+										<exclude>
+											META-INF/versions/9/module-info.class</exclude>
+									</excludes>
+								</filter>
+							</filters>
 						</configuration>
 					</execution>
 				</executions>

@@ -54,6 +54,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.springframework.mock.web.DelegatingServletInputStream;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.mock.web.MockMultipartHttpServletRequest;
 
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletException;
@@ -62,100 +65,118 @@ import jakarta.servlet.http.HttpServletResponse;
 
 public class RedirectToRootValveTest {
 
-    private RedirectToRootValve valve;
-    private Request mockRequest;
-    private Response mockResponse;
-    private RequestDispatcher mockRequestDispatcher;
-    private HttpServletRequest mockHttpServletReq;
-    private HttpServletResponse mockHttpServletResp;
-    private Context mockContext;
+	private RedirectToRootValve valve;
+	private Request mockRequest;
+	private Response mockResponse;
+	private RequestDispatcher mockRequestDispatcher;
+	private HttpServletRequest mockHttpServletReq;
+	private HttpServletResponse mockHttpServletResp;
+	private Context mockContext;
 
-    @BeforeEach
-    void setUp() throws Exception {
-        valve = new RedirectToRootValve();
-        mockRequest = mock(Request.class);
-        mockResponse = mock(Response.class);
-        mockContext = mock(Context.class);
-        mockRequestDispatcher = mock(RequestDispatcher.class);
-        mockHttpServletReq = mock(HttpServletRequest.class);
-        mockHttpServletResp = mock(HttpServletResponse.class);
+	@BeforeEach
+	void setUp() throws Exception {
+		valve = new RedirectToRootValve();
+		mockRequest = mock(Request.class);
+		mockResponse = mock(Response.class);
+		mockContext = mock(Context.class);
+		mockRequestDispatcher = mock(RequestDispatcher.class);
+		mockHttpServletReq = mock(HttpServletRequest.class);
+		mockHttpServletResp = mock(HttpServletResponse.class);
 
-        Valve mockNextValve = mock(Valve.class);
-        doNothing().when(mockNextValve).invoke(any(Request.class), any(Response.class));
-        valve.setNext(mockNextValve); // Sets the next the next valve.
-        
-        // Simulate the context.
-        when(mockRequest.getContext()).thenReturn(mockContext);
-        when(mockRequest.getRequestDispatcher(anyString())).thenReturn(mockRequestDispatcher);
-        when(mockRequest.getRequest()).thenReturn(mockHttpServletReq);
-        when(mockResponse.getResponse()).thenReturn(mockHttpServletResp);
-        when(mockContext.getPath()).thenReturn("/");
-        when(mockRequest.getContextPath()).thenReturn("");
-    }
+		Valve mockNextValve = mock(Valve.class);
+		doNothing().when(mockNextValve).invoke(any(Request.class), any(Response.class));
+		valve.setNext(mockNextValve); // Sets the next the next valve.
 
-    @Test
-    void requestAtRoot_NoRedirect() throws IOException {
-        // Request already goes to Root ("/"), therefore NO forward.
-        when(mockRequest.getRequestURI()).thenReturn("/");
-        when(mockRequest.getContextPath()).thenReturn("/");
+		// Simulate the context.
+		when(mockRequest.getContext()).thenReturn(mockContext);
+		when(mockRequest.getContentType()).thenReturn("application/xml");
+		when(mockRequest.getRequestDispatcher(anyString())).thenReturn(mockRequestDispatcher);
+		when(mockRequest.getRequest()).thenReturn(mockHttpServletReq);
+		when(mockHttpServletReq.getContentType()).thenReturn("application/xml");
+		when(mockResponse.getResponse()).thenReturn(mockHttpServletResp);
+		when(mockContext.getPath()).thenReturn("/");
+		when(mockRequest.getContextPath()).thenReturn("");
+	}
 
-        // Valve execution.
-        valve.invoke(mockRequest, mockResponse);
+	@Test
+	void requestAtRoot_NoRedirect() throws IOException {
+		// Request already goes to Root ("/"), therefore NO forward.
+		when(mockRequest.getRequestURI()).thenReturn("/");
+		when(mockRequest.getContextPath()).thenReturn("/");
 
-        // Check that NO forward happende.
-        verify(mockResponse, never()).sendRedirect(anyString());
-        verify(mockRequest, never()).getRequestDispatcher(anyString());
-    }
+		// Valve execution.
+		valve.invoke(mockRequest, mockResponse);
 
-    @ParameterizedTest
-    @CsvSource({
-        "/test, /",
-        "/test/, /",
-        "/test?q=1, /?q=1",
-        "/test/?q=1, /?q=1",
-        "/test/abc, /abc",
-        "/test/abc/, /abc",
-        "/test/abc?q=1, /abc?q=1",
-        "/test/abc/?q=1, /abc/?q=1",
-    })    
-    void requestNotAtRoot_Redirect(String originalRequestURI, String forwardURI) throws IOException {
-        // Request comes from an URI defined in the parameter.
-        when(mockRequest.getRequestURI()).thenReturn(originalRequestURI);
+		// Check that NO forward happende.
+		verify(mockResponse, never()).sendRedirect(anyString());
+		verify(mockRequest, never()).getRequestDispatcher(anyString());
+	}
 
-        // ArgumentCaptor to capure the URL of the forward.
-        ArgumentCaptor<String> redirectCaptor = ArgumentCaptor.forClass(String.class);
+	@ParameterizedTest
+	@CsvSource({ "/test, /", "/test/, /", "/test?q=1, /?q=1", "/test/?q=1, /?q=1", "/test/abc, /abc", "/test/abc/, /abc", "/test/abc?q=1, /abc?q=1", "/test/abc/?q=1, /abc/?q=1", })
+	void requestNotAtRoot_Redirect(String originalRequestURI, String forwardURI) throws IOException {
+		// Request comes from an URI defined in the parameter.
+		when(mockRequest.getRequestURI()).thenReturn(originalRequestURI);
 
-        // Valve execution.
-        valve.invoke(mockRequest, mockResponse);
+		// ArgumentCaptor to capure the URL of the forward.
+		ArgumentCaptor<String> redirectCaptor = ArgumentCaptor.forClass(String.class);
 
-        // Verify the forward.
-        verify(mockRequest).getRequestDispatcher(redirectCaptor.capture());
+		// Valve execution.
+		valve.invoke(mockRequest, mockResponse);
 
-        assertEquals(forwardURI, redirectCaptor.getValue(), "Expected: " + forwardURI + ", Actual: " + redirectCaptor.getValue());
-    }
+		// Verify the forward.
+		verify(mockRequest).getRequestDispatcher(redirectCaptor.capture());
 
-    @ParameterizedTest
-    @ValueSource(strings = { "/test", "/test?q=1", "/test/?q=1", "/test/abc", "/test/abc/", "/test/abc?q=1", "/test/abc/?q=1" })    
-    void attributesAreSet(String originalRequestURI) throws IOException {
-        // Request from original request URI.
-        when(mockRequest.getRequestURI()).thenReturn(originalRequestURI);
+		assertEquals(forwardURI, redirectCaptor.getValue(), "Expected: " + forwardURI + ", Actual: " + redirectCaptor.getValue());
+	}
 
-        // Valve execution.
-        valve.invoke(mockRequest, mockResponse);
+	@ParameterizedTest
+	@ValueSource(strings = { "/test", "/test?q=1", "/test/?q=1", "/test/abc", "/test/abc/", "/test/abc?q=1", "/test/abc/?q=1" })
+	void attributesAreSet(String originalRequestURI) throws IOException {
+		// Request from original request URI.
+		when(mockRequest.getRequestURI()).thenReturn(originalRequestURI);
 
-        // Check if the attributes are set.
-        verify(mockRequest).setAttribute(eq(ORIGINAL_CONTEXT_PATH), eq("/test"));
-        verify(mockRequest).setAttribute(eq(ORIGINAL_REQUEST_URI), eq(originalRequestURI));
-    }
-    
-    @Test
-    void requestDispatcherNull_NoRedirect() throws IOException, ServletException {
-    	when(mockRequest.getRequestDispatcher(anyString())).thenReturn(null);
-    	when(mockRequest.getRequestURI()).thenReturn("/nonexisting");
-    	
-        // Valve execution.
-        valve.invoke(mockRequest, mockResponse);
+		// Valve execution.
+		valve.invoke(mockRequest, mockResponse);
 
-        verify(mockRequestDispatcher, never()).forward(any(), any());
-    }
+		// Check if the attributes are set.
+		verify(mockRequest).setAttribute(eq(ORIGINAL_CONTEXT_PATH), eq("/test"));
+		verify(mockRequest).setAttribute(eq(ORIGINAL_REQUEST_URI), eq(originalRequestURI));
+	}
+
+	@Test
+	void requestDispatcherNull_NoRedirect() throws IOException, ServletException {
+		when(mockRequest.getRequestDispatcher(anyString())).thenReturn(null);
+		when(mockRequest.getRequestURI()).thenReturn("/nonexisting");
+
+		// Valve execution.
+		valve.invoke(mockRequest, mockResponse);
+
+		verify(mockRequestDispatcher, never()).forward(any(), any());
+	}
+
+	@Test
+	void mulitpart() throws IOException {
+		MockMultipartHttpServletRequest request = new MockMultipartHttpServletRequest();
+		MockMultipartFile multipartFile = new MockMultipartFile("file", // Parametername
+				"test.txt", // Originaldateiname
+				"text/plain", // Content-Type
+				"Testinhalt".getBytes() // Dateiinhalte als Byte-Array
+		);
+		request.setContentType("multipart/form-data; boundary=----TestBoundary");
+		request.addFile(multipartFile);
+
+		when(mockRequest.getContentType()).thenReturn("multipart/form-data; boundary=----TestBoundary");
+		when(mockRequest.getRequest()).thenReturn(request);
+		when(mockRequest.getInputStream()).thenReturn(new DelegatingServletInputStream(multipartFile.getInputStream()));
+		when(mockRequest.getRequestURI()).thenReturn("/test");
+
+		ArgumentCaptor<String> redirectCaptor = ArgumentCaptor.forClass(String.class);
+
+		valve.invoke(mockRequest, mockResponse);
+
+		verify(mockRequest).getRequestDispatcher(redirectCaptor.capture());
+
+		assertEquals("/", redirectCaptor.getValue(), "Expected: " + "/" + ", Actual: " + redirectCaptor.getValue());
+	}
 }
