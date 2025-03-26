@@ -30,42 +30,84 @@
  */
 package uhlution.tomcat.redirect2root;
 
-import static com.google.common.base.Splitter.on;
 import static org.apache.commons.lang3.ObjectUtils.notEqual;
 import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.StringUtils.splitPreserveAllTokens;
 import static org.apache.commons.lang3.StringUtils.substringBefore;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
 
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
 import org.apache.catalina.valves.ValveBase;
+import org.apache.commons.fileupload2.core.DiskFileItem;
+import org.apache.commons.fileupload2.core.DiskFileItemFactory;
+import org.apache.commons.fileupload2.jakarta.JakartaServletFileUpload;
+import org.apache.commons.fileupload2.jakarta.JakartaServletRequestContext;
 
+import jakarta.servlet.DispatcherType;
+import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
 
 public class RedirectToRootValve extends ValveBase {
 
 	public static final String ORIGINAL_REQUEST_URI = "originalRequestURI";
 	public static final String ORIGINAL_CONTEXT_PATH = "originalContextPath";
+	
+	static {
+        try (InputStream configStream = RedirectToRootValve.class.getResourceAsStream("/logging.properties")) {
+            if (configStream != null) {
+                LogManager.getLogManager().readConfiguration(configStream);
+            } 
+        } catch (IOException e) {
+            e.printStackTrace();
+        }		
+	}
+	private static final Logger LOG = Logger.getLogger(RedirectToRootValve.class.getName());
 
 	@Override
 	public void invoke(Request request, Response response) throws IOException {
 		String originalUri = request.getRequestURI();
 		
-		if (notEqual(originalUri, "/")) {
+		if (LOG.isLoggable(Level.FINE)) {
+			LOG.fine("Processing Request '" + request.getRequestURI() + "'.");
+		}
+		
+		if (notEqual(originalUri, "/") || request.getAttribute(ORIGINAL_CONTEXT_PATH) != null) {
 			request.setAttribute(ORIGINAL_REQUEST_URI, originalUri);
 			
 			String originalContext = evaluateOriginalContext(originalUri);
 			request.setAttribute(ORIGINAL_CONTEXT_PATH, originalContext);
+			request.setAttribute("customerCtx", originalContext);
 
 			String redirectUrl = evaluateRedirectUrl(originalUri, originalContext.length());
 
 			try {
-				request.getRequestDispatcher(redirectUrl).forward(request.getRequest(), response.getResponse());
+				if (isMultipartRequest(request)) {
+					wrapRequestWithCopiedParts(request, redirectUrl);			
+				}
+				
+				RequestDispatcher requestDispatcher = request.getRequestDispatcher(redirectUrl);
+				
+				if (requestDispatcher == null) {
+					LOG.warning("The requestDispatcher is null for request '" + redirectUrl + "'. Request is multipart? " + isMultipartRequest(request));
+					return;
+				}
+				
+				requestDispatcher.forward(request, response);
+				return;
 			} catch (ServletException | IOException e) {
 				throw new RuntimeException(e);
 			}
+		} else if(request.getDispatcherType() == DispatcherType.FORWARD) {
+			LOG.info("Request zu '" + request.getRequestURI() + "' wird nicht weiter geforwardet.");
 		} else {
 			try {
 				getNext().invoke(request, response);
@@ -73,6 +115,33 @@ public class RedirectToRootValve extends ValveBase {
 				throw new RuntimeException(e);
 			}
 		}
+	}
+
+	private void wrapRequestWithCopiedParts(Request request, String servletPath) throws IOException, ServletException {
+        HttpServletRequest httpReq = request.getRequest();
+        
+        // 📌 Extracts all query parameters manually from the URL (GET-Parameter).
+        //Map<String, List<String>> originalParams = extractQueryParameters(httpReq);
+
+        // 📌 Parses Multipart-Data using JakartaServletFileUpload.
+        DiskFileItemFactory factory = DiskFileItemFactory.builder()
+                .setBufferSize(1024 * 1024)
+                .get();
+        
+        JakartaServletFileUpload<DiskFileItem, DiskFileItemFactory> upload =
+                new JakartaServletFileUpload<>(factory);
+        List<DiskFileItem> items = upload.parseRequest(new JakartaServletRequestContext(request));
+
+        // 📌 Creates MultipartParameterRequestWrapper with original parameters (POST) and FileItems.
+        MultipartParameterRequestWrapper wrappedRequest = new MultipartParameterRequestWrapper(httpReq, items);
+
+        // 📌 Sets wrapper as request object.
+        request.setRequest(wrappedRequest);
+	}
+
+	private boolean isMultipartRequest(Request request) {
+		String ct = request.getRequest().getContentType();
+		return ct != null && ct.toLowerCase().startsWith("multipart/");
 	}
 
 	private String evaluateRedirectUrl(String originalUri, int originalContextLen) {
@@ -90,7 +159,17 @@ public class RedirectToRootValve extends ValveBase {
 	}
 
 	private String evaluateOriginalContext(String originalURI) {
-		return substringBefore( "/" + on('/').splitToList(originalURI).get(1), "?");
+	    // Zerlege die URI in Token, wobei leere Tokens erhalten bleiben (z.B. vor dem ersten '/')
+	    String[] tokens = splitPreserveAllTokens(originalURI, '/');
+	    
+	    // Prüfe, ob mindestens zwei Tokens vorhanden sind (das erste Token ist ggf. leer)
+	    if (tokens.length < 2) {
+	        return "";
+	    }
+	    // Entferne aus dem ersten relevanten Token (z.B. "abc?param=1") den Query-Teil
+	    String context = substringBefore(tokens[1], "?");
+	    
+	    return "/" + context;
 	}
 
 	@Override

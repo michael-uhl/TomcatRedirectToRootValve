@@ -35,6 +35,17 @@
             </goals>
             <configuration>
               <createDependencyReducedPom>true</createDependencyReducedPom>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/MANIFEST.MF</exclude>
+                    <exclude>META-INF/LICENSE.txt</exclude>
+                    <exclude>META-INF/NOTICE.txt</exclude>
+                    <exclude>META-INF/versions/9/module-info.class</exclude>
+                  </excludes>
+                </filter>
+              </filters>
             </configuration>
           </execution>
         </executions>
@@ -68,12 +79,6 @@
       <groupId>org.apache.tomcat</groupId>
       <artifactId>tomcat-catalina</artifactId>
       <version>10.1.26</version>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.projectlombok</groupId>
-      <artifactId>lombok</artifactId>
-      <version>1.18.34</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
@@ -161,13 +166,16 @@
   </dependencyManagement>
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
-    <lombok.version>1.18.34</lombok.version>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.source>21</maven.compiler.source>
     <commons.lang.version>3.17.0</commons.lang.version>
     <net.bytebuddy.agent.disabled>true</net.bytebuddy.agent.disabled>
-    <log4j.version>2.23.1</log4j.version>
-    <junit.version>5.11.0</junit.version>
     <mockito.version>5.16.0</mockito.version>
     <guava.version>33.4.0-jre</guava.version>
+    <tomcat.version>11.0.5</tomcat.version>
+    <lombok.version>1.18.34</lombok.version>
+    <maven.compiler.target>21</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <log4j.version>2.23.1</log4j.version>
+    <junit.version>5.11.0</junit.version>
   </properties>
 </project>

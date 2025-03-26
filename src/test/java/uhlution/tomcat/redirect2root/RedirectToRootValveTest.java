@@ -56,6 +56,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -130,10 +131,6 @@ public class RedirectToRootValveTest {
         // Verify the forward.
         verify(mockRequest).getRequestDispatcher(redirectCaptor.capture());
 
-        // Check that the request is forwarded to "/".
-        if (!forwardURI.equals(redirectCaptor.getValue()))
-        	System.out.println("Request: " + originalRequestURI + ", Expected: " + forwardURI + ", Actual: " + redirectCaptor.getValue());
-        
         assertEquals(forwardURI, redirectCaptor.getValue(), "Expected: " + forwardURI + ", Actual: " + redirectCaptor.getValue());
     }
 
@@ -149,5 +146,16 @@ public class RedirectToRootValveTest {
         // Check if the attributes are set.
         verify(mockRequest).setAttribute(eq(ORIGINAL_CONTEXT_PATH), eq("/test"));
         verify(mockRequest).setAttribute(eq(ORIGINAL_REQUEST_URI), eq(originalRequestURI));
+    }
+    
+    @Test
+    void requestDispatcherNull_NoRedirect() throws IOException, ServletException {
+    	when(mockRequest.getRequestDispatcher(anyString())).thenReturn(null);
+    	when(mockRequest.getRequestURI()).thenReturn("/nonexisting");
+    	
+        // Valve execution.
+        valve.invoke(mockRequest, mockResponse);
+
+        verify(mockRequestDispatcher, never()).forward(any(), any());
     }
 }
