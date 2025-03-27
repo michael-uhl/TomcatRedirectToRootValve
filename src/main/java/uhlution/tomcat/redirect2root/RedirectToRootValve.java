@@ -89,6 +89,8 @@ public class RedirectToRootValve extends ValveBase {
 
 			String redirectUrl = evaluateRedirectUrl(originalUri, originalContext.length());
 
+			LOG.warning("Redirect URL '" + redirectUrl + "'.");
+			
 			try {
 				if (isMultipartRequest(request)) {
 					wrapRequestWithCopiedParts(request, redirectUrl);			
@@ -107,7 +109,9 @@ public class RedirectToRootValve extends ValveBase {
 				throw new RuntimeException(e);
 			}
 		} else if(request.getDispatcherType() == DispatcherType.FORWARD) {
-			LOG.info("Request zu '" + request.getRequestURI() + "' wird nicht weiter geforwardet.");
+			if (LOG.isLoggable(Level.FINE)) {
+				LOG.fine("Request zu '" + request.getRequestURI() + "' wird nicht weiter geforwardet.");
+			}
 		} else {
 			try {
 				getNext().invoke(request, response);
